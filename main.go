@@ -14,7 +14,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var todosCollection *mongo.Collection
+type server struct {
+	db     *mongo.Database
+	router *gin.Engine
+}
+
+func (s server) start() {
+	router := s.router
+	router.GET("/todos", s.getTodos)
+	router.POST("/todos", s.postTodo)
+	router.GET("/todos/:id", s.getTodo)
+
+	router.Run("localhost:8080")
+}
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -24,15 +36,9 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	server := server{db: client.Database("todosdb"), router: gin.Default()}
 
-	todosCollection = client.Database("todosdb").Collection("todos")
-
-	router := gin.Default()
-	router.GET("/todos", getTodos)
-	router.POST("/todos", postTodo)
-	router.GET("/todos/:id", getTodo)
-
-	router.Run("localhost:8080")
+	server.start()
 }
 
 type ErrorResponse struct {
@@ -50,8 +56,8 @@ type TodoRequest struct {
 	Done bool   `json:"done"`
 }
 
-func getTodos(c *gin.Context) {
-	cur, err := todosCollection.Find(c.Request.Context(), bson.D{}, options.Find())
+func (s server) getTodos(c *gin.Context) {
+	cur, err := s.db.Collection("todos").Find(c.Request.Context(), bson.D{}, options.Find())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 		fmt.Println(err)
@@ -62,7 +68,7 @@ func getTodos(c *gin.Context) {
 	c.JSON(http.StatusOK, todos)
 }
 
-func postTodo(c *gin.Context) {
+func (s server) postTodo(c *gin.Context) {
 	reqBody := TodoRequest{}
 	err := c.BindJSON(&reqBody)
 	if err != nil {
@@ -71,7 +77,7 @@ func postTodo(c *gin.Context) {
 	}
 	newToDo := Todo{Id: uuid.NewString(), Text: reqBody.Text, Done: reqBody.Done}
 
-	_, err = todosCollection.InsertOne(c.Request.Context(), newToDo)
+	_, err = s.db.Collection("todos").InsertOne(c.Request.Context(), newToDo)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 		fmt.Println(err)
@@ -81,10 +87,10 @@ func postTodo(c *gin.Context) {
 	c.JSON(http.StatusCreated, newToDo)
 }
 
-func getTodo(c *gin.Context) {
+func (s server) getTodo(c *gin.Context) {
 	id := c.Param("id")
 	todo := Todo{}
-	err := todosCollection.FindOne(c.Request.Context(), bson.M{"id": id}).Decode(&todo)
+	err := s.db.Collection("todos").FindOne(c.Request.Context(), bson.M{"id": id}).Decode(&todo)
 	if err != nil {
 		if err.Error() == "mongo: no documents in result" {
 			c.JSON(http.StatusNotFound, ErrorResponse{Error: "Todo with specified id not found"})
