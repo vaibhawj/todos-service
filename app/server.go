@@ -28,6 +28,7 @@ func (s server) Start() {
 	router.GET("/todos", s.getTodos)
 	router.POST("/todos", s.postTodo)
 	router.GET("/todos/:id", s.getTodo)
+	router.PUT("/todos/:id", s.updateTodo)
 
 	router.Run("localhost:8080")
 }
@@ -75,4 +76,28 @@ func (s server) getTodo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, todo)
+}
+
+func (s server) updateTodo(c *gin.Context) {
+	id := c.Param("id")
+	reqBody := m.TodoRequest{}
+	err := c.BindJSON(&reqBody)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, m.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	newToDo := m.Todo{Id: id, Text: reqBody.Text, Done: reqBody.Done}
+	err = s.repo.UpdateTodo(c, newToDo)
+	if err != nil {
+		if err.Error() == "Todo with specified id not found" {
+			c.JSON(http.StatusNotFound, m.ErrorResponse{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, m.ErrorResponse{Error: err.Error()})
+		fmt.Println(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, newToDo)
 }

@@ -33,9 +33,17 @@ func (r Repository) CreateTodo(c context.Context, todo m.Todo) error {
 
 func (r Repository) FindById(c context.Context, id string) (m.Todo, error) {
 	todo := m.Todo{}
-	err := r.Collection.FindOne(c, bson.M{"id": id}).Decode(&todo)
+	err := r.Collection.FindOne(c, bson.M{"_id": id}).Decode(&todo)
 	if err != nil {
 		return m.Todo{}, err
 	}
 	return todo, nil
+}
+
+func (r Repository) UpdateTodo(c context.Context, todo m.Todo) error {
+	res, err := r.Collection.UpdateByID(c, todo.Id, bson.M{"$set": todo})
+	if res.MatchedCount == 0 {
+		return m.NotFoundError{}
+	}
+	return err
 }
