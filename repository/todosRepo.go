@@ -47,3 +47,11 @@ func (r Repository) UpdateTodo(c context.Context, todo m.Todo) error {
 	}
 	return err
 }
+
+func (r Repository) DeleteTodo(c context.Context, id string) error {
+	res, err := r.Collection.DeleteOne(c, bson.M{"_id": id})
+	if res.DeletedCount == 0 {
+		return m.NotFoundError{}
+	}
+	return err
+}

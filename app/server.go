@@ -29,6 +29,7 @@ func (s server) Start() {
 	router.POST("/todos", s.postTodo)
 	router.GET("/todos/:id", s.getTodo)
 	router.PUT("/todos/:id", s.updateTodo)
+	router.DELETE("/todos/:id", s.deleteTodo)
 
 	router.Run("localhost:8080")
 }
@@ -88,7 +89,7 @@ func (s server) updateTodo(c *gin.Context) {
 	}
 
 	newToDo := m.Todo{Id: id, Text: reqBody.Text, Done: reqBody.Done}
-	err = s.repo.UpdateTodo(c, newToDo)
+	err = s.repo.UpdateTodo(c.Request.Context(), newToDo)
 	if err != nil {
 		if err.Error() == "Todo with specified id not found" {
 			c.JSON(http.StatusNotFound, m.ErrorResponse{Error: err.Error()})
@@ -100,4 +101,19 @@ func (s server) updateTodo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, newToDo)
+}
+
+func (s server) deleteTodo(c *gin.Context) {
+	id := c.Param("id")
+	err := s.repo.DeleteTodo(c.Request.Context(), id)
+	if err != nil {
+		if err.Error() == "Todo with specified id not found" {
+			c.JSON(http.StatusNotFound, m.ErrorResponse{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, m.ErrorResponse{Error: err.Error()})
+		fmt.Println(err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
