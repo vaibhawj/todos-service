@@ -12,14 +12,14 @@ import (
 )
 
 type server struct {
-	db     *mongo.Database
-	router *gin.Engine
-	repo   r.Repository
+	db       *mongo.Database
+	router   *gin.Engine
+	todoRepo r.ToDoRepository
 }
 
 func NewServer(db *mongo.Database, router *gin.Engine) server {
 	server := server{db: db, router: router}
-	server.repo = r.Repository{Collection: db.Collection("todos")}
+	server.todoRepo = r.NewTodoRepository(db)
 	return server
 }
 
@@ -35,7 +35,7 @@ func (s server) Start() {
 }
 
 func (s server) getTodos(c *gin.Context) {
-	todos, err := s.repo.GetTodos(c.Request.Context())
+	todos, err := s.todoRepo.GetTodos(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, m.ErrorResponse{Error: err.Error()})
 		fmt.Println(err)
@@ -53,7 +53,7 @@ func (s server) postTodo(c *gin.Context) {
 	}
 	newToDo := m.Todo{Id: uuid.NewString(), Text: reqBody.Text, Done: reqBody.Done}
 
-	err = s.repo.CreateTodo(c.Request.Context(), newToDo)
+	err = s.todoRepo.CreateTodo(c.Request.Context(), newToDo)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, m.ErrorResponse{Error: err.Error()})
 		fmt.Println(err)
@@ -65,7 +65,7 @@ func (s server) postTodo(c *gin.Context) {
 
 func (s server) getTodo(c *gin.Context) {
 	id := c.Param("id")
-	todo, err := s.repo.FindById(c.Request.Context(), id)
+	todo, err := s.todoRepo.FindById(c.Request.Context(), id)
 	if err != nil {
 		if err.Error() == "mongo: no documents in result" {
 			c.JSON(http.StatusNotFound, m.ErrorResponse{Error: "Todo with specified id not found"})
@@ -89,7 +89,7 @@ func (s server) updateTodo(c *gin.Context) {
 	}
 
 	newToDo := m.Todo{Id: id, Text: reqBody.Text, Done: reqBody.Done}
-	err = s.repo.UpdateTodo(c.Request.Context(), newToDo)
+	err = s.todoRepo.UpdateTodo(c.Request.Context(), newToDo)
 	if err != nil {
 		if err.Error() == "Todo with specified id not found" {
 			c.JSON(http.StatusNotFound, m.ErrorResponse{Error: err.Error()})
@@ -105,7 +105,7 @@ func (s server) updateTodo(c *gin.Context) {
 
 func (s server) deleteTodo(c *gin.Context) {
 	id := c.Param("id")
-	err := s.repo.DeleteTodo(c.Request.Context(), id)
+	err := s.todoRepo.DeleteTodo(c.Request.Context(), id)
 	if err != nil {
 		if err.Error() == "Todo with specified id not found" {
 			c.JSON(http.StatusNotFound, m.ErrorResponse{Error: err.Error()})
